@@ -22,6 +22,7 @@ from object.crud import (
     download_file_and_upload_to_s3,
     get_objects,
     list_file_versions,
+    organize_by_extension,
     restore_previous_version,
     upload_file,
     upload_large_file,
@@ -124,6 +125,9 @@ parser.add_argument("-ev", "--enable_versioning", action="store_true", help="Ena
 parser.add_argument("-sv", "--suspend_versioning", action="store_true", help="Suspend bucket versioning")
 parser.add_argument("-lv", "--list_versions", action="store_true", help="List versions of a file (requires -k)")
 parser.add_argument("-rv", "--restore_version", action="store_true", help="Restore previous version as new (requires -k)")
+
+# ---------- NEW: organize by extension ----------
+parser.add_argument("-org", "--organize_by_extension", action="store_true", help="Move files into folders by extension")
 
 # Legacy
 parser.add_argument("-uf", "--upload_file", action="store_true", help="Simple upload (legacy)")
@@ -238,6 +242,10 @@ def main():
         if not args.key:
             parser.error("--restore_version / -rv requires --key / -k")
         restore_previous_version(s3_client, bn, args.key)
+
+    # -------- Organize by extension --------
+    if args.organize_by_extension:
+        organize_by_extension(s3_client, bn)
 
 
 if __name__ == "__main__":

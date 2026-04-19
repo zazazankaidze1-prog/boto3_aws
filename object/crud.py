@@ -239,3 +239,48 @@ def restore_previous_version(aws_s3_client, bucket_name, key):
     except ClientError as e:
         logging.error(e)
         return False
+
+
+def organize_by_extension(aws_s3_client, bucket_name):
+    try:
+        response = aws_s3_client.list_objects_v2(Bucket=bucket_name)
+        contents = response.get("Contents", [])
+        if not contents:
+            print(f"Bucket '{bucket_name}' is empty.")
+            return {}
+
+        counts = {}
+        for obj in contents:
+            key = obj["Key"]
+
+            if "/" in key:
+                continue
+
+            _, ext = os.path.splitext(key)
+            if not ext:
+                continue
+            ext = ext[1:].lower()
+
+            new_key = f"{ext}/{key}"
+
+            aws_s3_client.copy_object(
+                Bucket=bucket_name,
+                Key=new_key,
+                CopySource={"Bucket": bucket_name, "Key": key},
+            )
+            aws_s3_client.delete_object(Bucket=bucket_name, Key=key)
+            print(f"Moved: {key} -> {new_key}")
+
+            counts[ext] = counts.get(ext, 0) + 1
+
+        if not counts:
+            print("No files to organize (already organized or no extensions).")
+            return counts
+
+        print("\nSummary:")
+        for ext, n in sorted(counts.items()):
+            print(f"  {ext} - {n}")
+        return counts
+    except ClientError as e:
+        logging.error(e)
+        return {}
