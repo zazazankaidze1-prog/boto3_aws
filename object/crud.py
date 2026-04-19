@@ -180,3 +180,62 @@ def delete_object(aws_s3_client, bucket_name, key):
     except ClientError as e:
         logging.error(e)
         return False
+
+
+def list_file_versions(aws_s3_client, bucket_name, key):
+    """Return all versions of a given object key, newest first."""
+    try:
+        response = aws_s3_client.list_object_versions(Bucket=bucket_name, Prefix=key)
+        versions = [v for v in response.get("Versions", []) if v["Key"] == key]
+
+        if not versions:
+            print(f"No versions found for '{key}' in bucket '{bucket_name}'.")
+            return []
+
+        print(f"File '{key}' has {len(versions)} version(s):")
+        for i, v in enumerate(versions, start=1):
+            marker = " (latest)" if v.get("IsLatest") else ""
+            print(
+                f"  #{i}{marker}  VersionId={v['VersionId']}  "
+                f"LastModified={v['LastModified'].isoformat()}  "
+                f"Size={v['Size']}"
+            )
+        return versions
+    except ClientError as e:
+        logging.error(e)
+        return []
+
+
+def restore_previous_version(aws_s3_client, bucket_name, key):
+    """Copy the second-newest version over the current one as a new version."""
+    try:
+        response = aws_s3_client.list_object_versions(Bucket=bucket_name, Prefix=key)
+        versions = [v for v in response.get("Versions", []) if v["Key"] == key]
+
+        if len(versions) < 2:
+            print(
+                f"Cannot restore: '{key}' has {len(versions)} version(s). "
+                f"Need at least 2."
+            )
+            return False
+
+        previous = versions[1]
+        previous_version_id = previous["VersionId"]
+
+        aws_s3_client.copy_object(
+            Bucket=bucket_name,
+            Key=key,
+            CopySource={
+                "Bucket": bucket_name,
+                "Key": key,
+                "VersionId": previous_version_id,
+            },
+        )
+        print(
+            f"Restored previous version ({previous_version_id}) of '{key}' "
+            f"as the new latest version."
+        )
+        return True
+    except ClientError as e:
+        logging.error(e)
+        return False

@@ -12,10 +12,17 @@ from bucket.lifecycle import (
     set_lifecycle_policy,
 )
 from bucket.policy import assign_policy, read_bucket_policy
+from bucket.versioning import (
+    enable_bucket_versioning,
+    get_bucket_versioning_status,
+    suspend_bucket_versioning,
+)
 from object.crud import (
     delete_object,
     download_file_and_upload_to_s3,
     get_objects,
+    list_file_versions,
+    restore_previous_version,
     upload_file,
     upload_large_file,
     upload_small_file,
@@ -111,6 +118,13 @@ parser.add_argument("-gslc", "--get_lifecycle", action="store_true", help="Get l
 parser.add_argument("-dlc", "--delete_lifecycle", action="store_true", help="Delete lifecycle policy")
 parser.add_argument("-days", "--lifecycle_days", type=int, help="Expiration days (default 120)", default=120)
 
+# ---------- NEW: versioning ----------
+parser.add_argument("-gv", "--get_versioning", action="store_true", help="Show bucket versioning status")
+parser.add_argument("-ev", "--enable_versioning", action="store_true", help="Enable bucket versioning")
+parser.add_argument("-sv", "--suspend_versioning", action="store_true", help="Suspend bucket versioning")
+parser.add_argument("-lv", "--list_versions", action="store_true", help="List versions of a file (requires -k)")
+parser.add_argument("-rv", "--restore_version", action="store_true", help="Restore previous version as new (requires -k)")
+
 # Legacy
 parser.add_argument("-uf", "--upload_file", action="store_true", help="Simple upload (legacy)")
 
@@ -203,6 +217,27 @@ def main():
 
     if args.delete_lifecycle and delete_lifecycle_policy(s3_client, bn):
         print("Lifecycle policy deleted")
+
+    # -------- Versioning --------
+    if args.get_versioning:
+        status = get_bucket_versioning_status(s3_client, bn)
+        print(f"Versioning status for '{bn}': {status}")
+
+    if args.enable_versioning and enable_bucket_versioning(s3_client, bn):
+        print(f"Versioning enabled on '{bn}'")
+
+    if args.suspend_versioning and suspend_bucket_versioning(s3_client, bn):
+        print(f"Versioning suspended on '{bn}'")
+
+    if args.list_versions:
+        if not args.key:
+            parser.error("--list_versions / -lv requires --key / -k")
+        list_file_versions(s3_client, bn, args.key)
+
+    if args.restore_version:
+        if not args.key:
+            parser.error("--restore_version / -rv requires --key / -k")
+        restore_previous_version(s3_client, bn, args.key)
 
 
 if __name__ == "__main__":
