@@ -43,11 +43,12 @@ def get_objects(aws_s3_client, bucket_name):
 
 
 def validate_mimetype(file_path, allowed=None):
-    """Guess mimetype and check against the allowlist."""
+    """Guess mimetype and check against the allowlist. Rejects unknown types."""
     allowed = allowed or ALLOWED_MIMETYPES
     mime_type, _ = mimetypes.guess_type(file_path)
     if mime_type is None:
-        mime_type = "application/octet-stream"
+        print(f"Rejected: unknown mimetype for '{file_path}'")
+        return None
     if mime_type not in allowed:
         print(f"Rejected: mimetype '{mime_type}' is not allowed.")
         return None
@@ -169,3 +170,13 @@ def upload_file_put(aws_s3_client, filename, bucket_name):
         aws_s3_client.put_object(
             Bucket=bucket_name, Key=os.path.basename(filename), Body=file.read()
         )
+
+
+def delete_object(aws_s3_client, bucket_name, key):
+    try:
+        aws_s3_client.delete_object(Bucket=bucket_name, Key=key)
+        print(f"Deleted: s3://{bucket_name}/{key}")
+        return True
+    except ClientError as e:
+        logging.error(e)
+        return False

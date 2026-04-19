@@ -13,6 +13,7 @@ from bucket.lifecycle import (
 )
 from bucket.policy import assign_policy, read_bucket_policy
 from object.crud import (
+    delete_object,
     download_file_and_upload_to_s3,
     get_objects,
     upload_file,
@@ -24,29 +25,56 @@ from object.crud import (
 parser = argparse.ArgumentParser(
     description="CLI program that helps with S3 buckets.",
     usage="""
-    List buckets:
+    How to download and upload directly:
+    short:
+        python main.py -bn new-bucket-btu-7 -ol https://cdn.activestate.com/wp-content/uploads/2021/12/python-coding-mistakes.jpg -du
+    long:
+       python main.py  --bucket_name new-bucket-btu-7 --object_link https://cdn.activestate.com/wp-content/uploads/2021/12/python-coding-mistakes.jpg --download_upload
+
+    How to list buckets:
+    short:
         python main.py -lb
+    long:
+        python main.py --list_buckets
 
-    Create bucket:
-        python main.py -bn my-bucket -cb -region us-east-1
+    How to create bucket:
+    short:
+        -bn new-bucket-btu-1 -cb -region us-west-2
+    long:
+        --bucket_name new-bucket-btu-1 --create_bucket --region us-west-2
 
-    Upload SMALL file (<100MB) with mimetype validation:
+    How to assign missing policy:
+    short:
+        -bn new-bucket-btu-1 -amp
+    long:
+        --bn new-bucket-btu-1 --assign_missing_policy
+
+    How to upload SMALL file (<100MB, with mimetype validation):
+    short:
         python main.py -bn my-bucket -usf -fp ./photo.jpg
+    long:
+        python main.py --bucket_name my-bucket --upload_small_file --file_path ./photo.jpg
 
-    Upload LARGE file (multipart):
+    How to upload LARGE file (multipart):
+    short:
         python main.py -bn my-bucket -ulf -fp ./video.mp4
+    long:
+        python main.py --bucket_name my-bucket --upload_large_file --file_path ./video.mp4
 
-    Set 120-day lifecycle policy:
+    How to set 120-day Lifecycle Policy:
+    short:
         python main.py -bn my-bucket -slc
+    long:
+        python main.py --bucket_name my-bucket --set_lifecycle
 
-    Get lifecycle policy:
-        python main.py -bn my-bucket -gslc
-
-    Delete lifecycle policy:
-        python main.py -bn my-bucket -dlc
+    How to delete a specific object:
+    short:
+        python main.py -bn my-bucket -del -k photo.jpg
+    long:
+        python main.py --bucket_name my-bucket --delete_object --key photo.jpg
     """,
     prog="main.py",
-    epilog="DEMO APP FOR BTU_AWS — Lecture 3",
+    epilog="DEMO APP FOR BTU_AWS",
 )
 
 # ---------- Bucket flags ----------
@@ -68,6 +96,8 @@ parser.add_argument("-rben", "--read_bucket_encryption", action="store_true", he
 parser.add_argument("-lo", "--list_objects", action="store_true", help="List objects in bucket")
 parser.add_argument("-du", "--download_upload", action="store_true", help="Download from URL and upload to bucket")
 parser.add_argument("-ol", "--object_link", type=str, help="URL to download and re-upload", default=None)
+parser.add_argument("-del", "--delete_object", action="store_true", help="Delete object from bucket (requires -k)")
+parser.add_argument("-k", "--key", type=str, help="Object Key (file name inside the bucket)", default=None)
 
 # ---------- NEW: small / large file upload ----------
 parser.add_argument("-usf", "--upload_small_file", action="store_true", help="Upload small file (<100MB)")
@@ -135,6 +165,11 @@ def main():
 
     if args.object_link and args.download_upload:
         print(download_file_and_upload_to_s3(s3_client, bn, args.object_link))
+
+    if args.delete_object:
+        if not args.key:
+            parser.error("--delete_object / -del requires --key / -k (object name)")
+        delete_object(s3_client, bn, args.key)
 
     validate_mime = not args.skip_mime_validation
 
